@@ -38,7 +38,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 # ------------------ Initialize Extensions ------------------
 db.init_app(app)
 CORS(app, resources={r"/api/*": {
-    "origins": ["http://localhost:5173"],
+    "origins": ["https://ramstoress.netlify.app/"],
     "methods": ["GET", "POST", "PUT", "DELETE","OPTIONS"],
     "allow_headers": ["Authorization", "Content-Type"]
 }})
