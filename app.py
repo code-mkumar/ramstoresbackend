@@ -78,7 +78,8 @@ app.register_blueprint(review_bp, url_prefix='/api/reviews')
 app.register_blueprint(carousel_bp,url_prefix='/api/carousel')
 
 
-# ------------------ Run Application ------------------
 if __name__ == "__main__":
     initialize_app()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Render assigns a PORT
+    app.run(host="0.0.0.0", port=port, debug=True)
+
