@@ -452,9 +452,16 @@ def delete_product(product_id):
 
 
 
-@admin_bp.route('/orders/confirm-all', methods=['POST'])
-@jwt_required()
+@admin_bp.route('/orders/confirm-all', methods=['POST','OPTIONS'])
+@jwt_required(optional=True)
 def confirm_all_orders():
+     # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response, 200
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
