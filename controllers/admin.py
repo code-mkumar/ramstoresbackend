@@ -9,6 +9,11 @@ from utils.helper import *
 import os
 from werkzeug.utils import secure_filename
 import shutil
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch
+import io
+from flask import send_file
 
 from sqlalchemy import text
 
@@ -444,6 +449,80 @@ def delete_product(product_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+
+@admin_bp.route('/orders/confirm-all', methods=['POST'])
+@jwt_required()
+def confirm_all_orders():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if user.role != 'admin':
+            return jsonify({'success': False, 'message': 'Admin access required'}), 403
+
+        pending_orders = Order.query.filter_by(status="Pending").all()
+
+        if len(pending_orders) == 0:
+            return jsonify({'success': False, 'message': 'No pending orders'}), 400
+
+        # PDF BUFFER
+        pdf_buffer = io.BytesIO()
+        pdf = canvas.Canvas(pdf_buffer, pagesize=A4)
+
+        for order in pending_orders:
+            # ----------- Bill Page Layout ------------
+            pdf.setFont("Helvetica-Bold", 20)
+            pdf.drawString(200, 800, "RAM STORES")
+
+            pdf.setFont("Helvetica", 12)
+            pdf.drawString(50, 770, f"Order Number: {order.order_number}")
+            pdf.drawString(50, 750, f"Customer: {order.customer.username}")
+            pdf.drawString(50, 730, f"Order Date: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
+
+            pdf.line(50, 710, 550, 710)
+            pdf.setFont("Helvetica-Bold", 12)
+            pdf.drawString(50, 690, "Product")
+            pdf.drawString(250, 690, "Qty")
+            pdf.drawString(350, 690, "Price")
+            pdf.drawString(450, 690, "Total")
+            pdf.line(50, 680, 550, 680)
+
+            y = 660
+            pdf.setFont("Helvetica", 12)
+            for item in order.items:
+                pdf.drawString(50, y, item.product.name)
+                pdf.drawString(250, y, str(item.quantity))
+                pdf.drawString(350, y, f"₹{item.unit_price}")
+                pdf.drawString(450, y, f"₹{item.total_price}")
+                y -= 20
+
+            pdf.line(50, y - 10, 550, y - 10)
+            pdf.setFont("Helvetica-Bold", 14)
+            pdf.drawString(50, y - 40, f"Grand Total: ₹{order.total_amount}")
+
+            # Finish page
+            pdf.showPage()
+
+            # Update status
+            order.status = "Confirmed"
+
+        db.session.commit()
+
+        pdf.save()
+        pdf_buffer.seek(0)
+
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name="all_orders_bill.pdf",
+            mimetype="application/pdf"
+        )
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # ==================== ORDER MANAGEMENT ====================
 @admin_bp.route('/orders', methods=['GET'])
@@ -1156,18 +1235,24 @@ def get_all_notifications():
         if not user or user.role != 'admin':
             return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
-        notifications = Notification.query.order_by(Notification.created_at.desc()).all()
+        notifications = (
+            db.session.query(Notification, User)
+            .join(User, Notification.user_id == User.id)
+            .order_by(Notification.created_at.desc())
+            .all()
+        )
+
         notifications_data = [
             {
                 'id': n.id,
-                'user_id': n.user_id,
+                'username': u.username,   
                 'title': n.title,
                 'message': n.message,
                 'is_read': n.is_read,
                 'created_at': n.created_at.isoformat()
-            } for n in notifications
+            }
+            for n, u in notifications
         ]
-
         return jsonify({'success': True, 'notifications': notifications_data}), 200
 
     except Exception as e:
