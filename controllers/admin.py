@@ -452,21 +452,22 @@ def delete_product(product_id):
 
 
 
-@admin_bp.route('/orders/confirm-all', methods=['POST','OPTIONS'])
+@admin_bp.route('/orders/confirm-all', methods=['POST', 'OPTIONS'])
 @jwt_required(optional=True)
 def confirm_all_orders():
-     # Handle preflight OPTIONS request
+    # Handle preflight OPTIONS request
     if request.method == 'OPTIONS':
         response = jsonify({'status': 'ok'})
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
         return response, 200
+    
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
 
-        if user.role != 'admin':
+        if not user or user.role != 'admin':
             return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
         pending_orders = Order.query.filter_by(status="Pending").all()
@@ -520,17 +521,22 @@ def confirm_all_orders():
         pdf.save()
         pdf_buffer.seek(0)
 
+        # Encode PDF to base64
         pdf_base64 = base64.b64encode(pdf_buffer.read()).decode('utf-8')
     
-        return jsonify({
+        response = jsonify({
             'success': True,
             'pdf': pdf_base64,
             'filename': 'all_orders_bill.pdf'
-    })
+        })
+        
+        # Add CORS headers
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
 
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 # ==================== ORDER MANAGEMENT ====================
 @admin_bp.route('/orders', methods=['GET'])

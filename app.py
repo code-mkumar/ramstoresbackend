@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
-
+import base64 
 from models import db, User
 
 # Import all blueprints
