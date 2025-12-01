@@ -1250,28 +1250,33 @@ def get_all_notifications():
             return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
         notifications = (
-            db.session.query(Notification, User)
-            .join(User, Notification.user_id == User.id)
+            db.session.query(Notification)
             .order_by(Notification.created_at.desc())
             .all()
         )
 
-        notifications_data = [
-            {
+        notifications_data = []
+        for n in notifications:
+            # If sent to all users
+            if n.user_id is None:
+                username = "All Users"
+            else:
+                u = User.query.get(n.user_id)
+                username = u.username if u else "Unknown User"
+
+            notifications_data.append({
                 'id': n.id,
-                'username': u.username,   
+                'username': username,
                 'title': n.title,
                 'message': n.message,
                 'is_read': n.is_read,
                 'created_at': n.created_at.isoformat()
-            }
-            for n, u in notifications
-        ]
+            })
+
         return jsonify({'success': True, 'notifications': notifications_data}), 200
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 # ------------------ Update notification (mark as read/unread) ------------------
 @admin_bp.route('/notifications/<int:id>', methods=['PUT'])
