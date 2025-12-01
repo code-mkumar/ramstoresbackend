@@ -451,18 +451,11 @@ def delete_product(product_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-
-import io
-import base64
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-
 @admin_bp.route('/orders/confirm-all', methods=['POST'])
 @jwt_required()
 def confirm_all_orders():
 
     try:
-        # Admin validation
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
 
@@ -470,14 +463,15 @@ def confirm_all_orders():
             return jsonify({'success': False, 'message': 'Admin access required'}), 403
 
         pending_orders = Order.query.filter_by(status="Pending").all()
-        if len(pending_orders) == 0:
-            return jsonify({'success': True, 'message': 'No pending orders'}), 400
+        if not pending_orders:
+            return jsonify({'success': False, 'message': 'No pending orders'}), 400
 
-        # Create PDF
-        pdf_buffer = io.BytesIO()
-        pdf = canvas.Canvas(pdf_buffer, pagesize=A4)
+        # Create PDF buffer
+        buffer = io.BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
 
         for order in pending_orders:
+
             pdf.setFont("Helvetica-Bold", 20)
             pdf.drawString(200, 800, "RAM STORES")
 
@@ -508,27 +502,30 @@ def confirm_all_orders():
             pdf.drawString(50, y - 40, f"Grand Total: ₹{order.total_amount}")
 
             pdf.showPage()
+
+            # Update each order
             order.status = "Confirmed"
+            db.session.add(order)
 
         db.session.commit()
 
-        pdf.save()
-        pdf_buffer.seek(0)
+        # VERY IMPORTANT:
+        pdf.save()              # finalize PDF writing
+        buffer.seek(0)          # reset pointer BEFORE reading
+        pdf_bytes = buffer.read()  # read binary PDF data
 
-        # Base64 encode PDF
-        pdf_base64 = base64.b64encode(pdf_buffer.read()).decode('utf-8')
+        # Encode PDF
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
 
-        response = jsonify({
+        return jsonify({
             'success': True,
             'pdf': pdf_base64,
             'filename': 'all_orders_bill.pdf'
         })
-        return response
 
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 # ==================== ORDER MANAGEMENT ====================
 @admin_bp.route('/orders', methods=['GET'])
