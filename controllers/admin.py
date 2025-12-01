@@ -471,7 +471,7 @@ def confirm_all_orders():
 
         pending_orders = Order.query.filter_by(status="Pending").all()
         if len(pending_orders) == 0:
-            return jsonify({'success': False, 'message': 'No pending orders'}), 400
+            return jsonify({'success': True, 'message': 'No pending orders'}), 400
 
         # Create PDF
         pdf_buffer = io.BytesIO()
