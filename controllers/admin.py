@@ -513,12 +513,13 @@ def confirm_all_orders():
         pdf.save()
         pdf_buffer.seek(0)
 
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name="all_orders_bill.pdf",
-            mimetype="application/pdf"
-        )
+        pdf_base64 = base64.b64encode(pdf_buffer.read()).decode('utf-8')
+    
+        return jsonify({
+            'success': True,
+            'pdf': pdf_base64,
+            'filename': 'all_orders_bill.pdf'
+    })
 
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
