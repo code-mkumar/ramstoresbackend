@@ -392,7 +392,7 @@ def google_login():
 
         email = idinfo["email"]
         name = idinfo.get("name", "")
-        picture = idinfo.get("picture", "")
+ 
 
         # Check if user exists
         user = User.query.filter_by(email=email).first()
@@ -405,7 +405,6 @@ def google_login():
                 full_name=name,
                 password=generate_password_hash(os.urandom(16).hex()),
                 role="user",
-                profile_image=picture    # Save Google profile pic
             )
             db.session.add(user)
             db.session.commit()
