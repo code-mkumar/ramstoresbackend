@@ -454,7 +454,6 @@ def delete_product(product_id):
 @admin_bp.route('/orders/confirm-all', methods=['POST'])
 @jwt_required()
 def confirm_all_orders():
-
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
@@ -466,66 +465,42 @@ def confirm_all_orders():
         if not pending_orders:
             return jsonify({'success': False, 'message': 'No pending orders'}), 400
 
-        # Create PDF buffer
-        buffer = io.BytesIO()
-        pdf = canvas.Canvas(buffer, pagesize=A4)
+        orders_data = []
 
         for order in pending_orders:
+            order_dict = {
+                "order_number": order.order_number,
+                "customer": order.customer.username,
+                "created_at": order.created_at.strftime('%Y-%m-%d %H:%M'),
+                "total_amount": order.total_amount,
+                "items": [
+                    {
+                        "product": item.product.name,
+                        "quantity": item.quantity,
+                        "unit_price": item.unit_price,
+                        "total_price": item.total_price
+                    }
+                    for item in order.items
+                ]
+            }
 
-            pdf.setFont("Helvetica-Bold", 20)
-            pdf.drawString(200, 800, "RAM STORES")
+            orders_data.append(order_dict)
 
-            pdf.setFont("Helvetica", 12)
-            pdf.drawString(50, 770, f"Order Number: {order.order_number}")
-            pdf.drawString(50, 750, f"Customer: {order.customer.username}")
-            pdf.drawString(50, 730, f"Order Date: {order.created_at.strftime('%Y-%m-%d %H:%M')}")
-
-            pdf.line(50, 710, 550, 710)
-            pdf.setFont("Helvetica-Bold", 12)
-            pdf.drawString(50, 690, "Product")
-            pdf.drawString(250, 690, "Qty")
-            pdf.drawString(350, 690, "Price")
-            pdf.drawString(450, 690, "Total")
-            pdf.line(50, 680, 550, 680)
-
-            y = 660
-            pdf.setFont("Helvetica", 12)
-            for item in order.items:
-                pdf.drawString(50, y, item.product.name)
-                pdf.drawString(250, y, str(item.quantity))
-                pdf.drawString(350, y, f"₹{item.unit_price}")
-                pdf.drawString(450, y, f"₹{item.total_price}")
-                y -= 20
-
-            pdf.line(50, y - 10, 550, y - 10)
-            pdf.setFont("Helvetica-Bold", 14)
-            pdf.drawString(50, y - 40, f"Grand Total: ₹{order.total_amount}")
-
-            pdf.showPage()
-
-            # Update each order
+            # Update order status
             order.status = "Confirmed"
             db.session.add(order)
 
         db.session.commit()
 
-        # VERY IMPORTANT:
-        pdf.save()              # finalize PDF writing
-        buffer.seek(0)          # reset pointer BEFORE reading
-        pdf_bytes = buffer.read()  # read binary PDF data
-
-        # Encode PDF
-        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
-
         return jsonify({
-            'success': True,
-            'pdf': pdf_base64,
-            'filename': 'all_orders_bill.pdf'
+            "success": True,
+            "orders": orders_data
         })
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # ==================== ORDER MANAGEMENT ====================
 @admin_bp.route('/orders', methods=['GET'])
