@@ -11,7 +11,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 from utils.email_services import *
 
-GOOGLE_CLIENT_ID = "742754265041-bkuj35g964iuq54mmp7canauo6ekh6tk.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = "369885088133-j9n7d76p6aukqljpb76fpsfu68bq76mj.apps.googleusercontent.com"
 auth_bp = Blueprint('auth', __name__)
 
 # Helper: validate email
