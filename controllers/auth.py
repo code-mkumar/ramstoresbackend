@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -374,13 +375,20 @@ def resend_otp():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
     
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
 @auth_bp.route('/google-login', methods=['POST'])
 def google_login():
     try:
         token = request.json.get("token")
 
         # Verify Google token
-        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), GOOGLE_CLIENT_ID)
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
 
         email = idinfo["email"]
         name = idinfo.get("name", "")
@@ -390,13 +398,14 @@ def google_login():
         user = User.query.filter_by(email=email).first()
 
         if not user:
-            # Auto register + assign default role
+            # Create new user
             user = User(
                 username=email.split("@")[0],
                 email=email,
                 full_name=name,
-                password=generate_password_hash("google_oauth_user"), 
-                role="user"
+                password=generate_password_hash(os.urandom(16).hex()),
+                role="user",
+                profile_image=picture    # Save Google profile pic
             )
             db.session.add(user)
             db.session.commit()
@@ -413,8 +422,14 @@ def google_login():
                 "username": user.username,
                 "email": user.email,
                 "role": user.role,
-                "full_name": user.full_name
+                "full_name": user.full_name,
+                "profile_image": user.profile_image
             }
         })
+
+    except ValueError:
+        # Invalid Google token
+        return jsonify({"success": False, "message": "Invalid Google token"}), 401
+
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 400
