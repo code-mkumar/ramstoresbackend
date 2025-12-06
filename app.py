@@ -173,6 +173,7 @@ def add_missing_order_columns():
         raise
 
 
+
 def ensure_primary_keys_and_constraints():
     """Ensure primary keys and unique constraints exist for referenced tables."""
     try:
