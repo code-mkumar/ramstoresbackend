@@ -78,8 +78,32 @@ def serve_uploaded_file(filename):
 # ------------------ Initialize DB and Create Default Admin ------------------
 def initialize_app():
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            print("❌ Database create_all() failed:", str(e))
+            print("⚠️ Trying to fix invalid foreign keys...")
+
+            # Force drop broken tables only
+            from sqlalchemy import inspect
+            insp = inspect(db.engine)
+
+            broken_tables = ["payments", "order_items", "orders"]
+
+            for tbl in broken_tables:
+                if insp.has_table(tbl):
+                    try:
+                        db.engine.execute(f'DROP TABLE "{tbl}" CASCADE;')
+                        print(f"⚠️ Dropped broken table: {tbl}")
+                    except Exception as drop_err:
+                        print(f"❌ Failed dropping {tbl}: {drop_err}")
+
+            # Retry create_all
+            db.create_all()
+            print("✅ Database recreated successfully!")
+
         create_upload_dirs()
+
 
 # ------------------ Register Blueprints ------------------
 app.register_blueprint(auth_bp, url_prefix='/api/auth')

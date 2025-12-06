@@ -171,12 +171,13 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     order_number = db.Column(db.String(50), unique=True, index=True)  # Human-readable order ID
-    total_amount = db.Column(db.Float, nullable=False)  # quantity * unit_price
+    total_amount = db.Column(db.Float, nullable=False)  # Calculated from order items
     status = db.Column(db.String(20), default='Pending', index=True)  # Pending / Confirmed / Shipped / Delivered / Cancelled
     payment_status = db.Column(db.String(10), default='Unpaid', index=True)  # Unpaid / Paid / Refunded
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Validators
     @validates('status')
     def validate_status(self, key, status):
         valid_statuses = ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled']
@@ -191,17 +192,11 @@ class Order(db.Model):
             raise ValueError(f"Payment status must be one of {valid_payment_statuses}")
         return payment_status
 
-    @validates('quantity')
-    def validate_quantity(self, key, quantity):
-        if quantity < 1:
-            raise ValueError("Quantity must be at least 1")
-        return quantity
-
     def __repr__(self):
         return f"<Order {self.order_number} - User {self.user_id}>"
 
 
-# ------------------ OrderItems (for multiple products per order) ------------------
+# ------------------ Order Items ------------------
 class OrderItem(db.Model):
     __tablename__ = 'order_items'
 
@@ -225,7 +220,7 @@ class OrderItem(db.Model):
         return f"<OrderItem Order:{self.order_id} Product:{self.product_id}>"
 
 
-# ------------------ OrderItems (for multiple products per order) ------------------
+# ------------------ Payments ------------------
 class Payment(db.Model):
     __tablename__ = 'payments'
 
@@ -233,16 +228,16 @@ class Payment(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     
-    # Razorpay / payment gateway fields
-    payment_id = db.Column(db.String(100), unique=True, nullable=True)  # Razorpay payment ID
-    order_payment_id = db.Column(db.String(100), nullable=True)  # Razorpay order ID (for creating payment)
-    signature = db.Column(db.String(200), nullable=True)  # Razorpay signature for verification
+    # Razorpay fields
+    payment_id = db.Column(db.String(100), unique=True, nullable=True)   # Razorpay payment ID
+    order_payment_id = db.Column(db.String(100), nullable=True)          # Razorpay order ID
+    signature = db.Column(db.String(200), nullable=True)                 # Verification signature
     
-    amount = db.Column(db.Float, nullable=False)  # Amount paid
-    currency = db.Column(db.String(10), default='INR')  # Currency
-    status = db.Column(db.String(20), default='Pending', index=True)  # Pending / Completed / Failed / Refunded
-    payment_method = db.Column(db.String(50), nullable=True)  # e.g., 'card', 'upi', 'netbanking'
-    
+    amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='INR')
+    status = db.Column(db.String(20), default='Pending', index=True)     # Pending / Completed / Failed / Refunded
+    payment_method = db.Column(db.String(50), nullable=True)             # card / upi / etc.
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
