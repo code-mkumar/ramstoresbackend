@@ -80,62 +80,33 @@ def initialize_app():
     with app.app_context():
         try:
             db.create_all()
-            print("✅ Database tables verified/created successfully!")
+            print("✅ Database tables ready")
         except Exception as e:
-            error_msg = str(e)
-            print("❌ Database create_all() failed:", error_msg)
-            
-            # Check if it's the foreign key constraint error
-            if "no unique constraint matching given keys" in error_msg:
-                print("⚠️  Foreign key constraint error detected")
-                print("⚠️  Attempting to fix while preserving data...")
-                
-                try:
-                    with db.engine.connect() as conn:
-                        insp = inspect(db.engine)
-                        
-                        # Only drop the payments table (it can be recreated)
-                        # This preserves your orders, products, users, etc.
-                        if insp.has_table('payments'):
-                            print("🗑️  Dropping payments table (will be recreated)...")
-                            conn.execute(text('DROP TABLE IF EXISTS payments CASCADE'))
-                            conn.commit()
-                            print("✅ Payments table dropped")
-                        
-                        # Ensure orders table has proper primary key
-                        if insp.has_table('orders'):
-                            print("🔍 Verifying orders table structure...")
-                            
-                            # Check for primary key
-                            pk_result = conn.execute(text("""
-                                SELECT constraint_name 
-                                FROM information_schema.table_constraints 
-                                WHERE table_name = 'orders' 
-                                AND constraint_type = 'PRIMARY KEY'
-                            """))
-                            
-                            if not pk_result.fetchone():
-                                print("➕ Adding primary key to orders table...")
-                                conn.execute(text('ALTER TABLE orders ADD PRIMARY KEY (id)'))
-                                conn.commit()
-                                print("✅ Primary key added")
-                        
-                        # Now retry creating all tables
-                        print("📦 Creating missing tables...")
-                        db.create_all()
-                        print("✅ Database structure fixed successfully!")
-                        print("✅ Your existing data has been preserved!")
-                        
-                except Exception as fix_error:
-                    print(f"❌ Could not auto-fix database: {fix_error}")
-                    print("\n⚠️  MANUAL FIX REQUIRED:")
-                    print("Run the fix_database.py script separately")
-                    raise
-            else:
-                # Different error - just raise it
-                raise
-        
-        # Create upload directories
+            print("❌ Error during DB init:", str(e))
+            raise
+
+        # ----------- CREATE DEFAULT ADMIN USER -----------
+        from models import User
+        from werkzeug.security import generate_password_hash
+
+        admin = User.query.filter_by(username="admin").first()
+
+        if not admin:
+            print("👑 Creating default admin user...")
+            admin = User(
+                username="admin",
+                password=generate_password_hash("admin123"),  # default password
+                role="admin",
+                full_name="Admin User",
+                email="admin@example.com"
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("✅ Admin user created: admin / admin123")
+        else:
+            print("👑 Admin user already exists")
+
+        # ----------- UPLOAD FOLDERS -----------
         create_upload_dirs()
         print("📁 Upload directories ready")
 
