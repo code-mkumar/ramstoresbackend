@@ -6,6 +6,7 @@ import os
 import base64 
 from models import db, User, Order, OrderItem
 from sqlalchemy import text, inspect
+import sys
 
 # Import all blueprints
 from controllers.auth import auth_bp
@@ -172,6 +173,184 @@ def add_missing_order_columns():
         print(f"❌ Error adding columns: {e}")
         raise
 
+def diagnose_column_types():
+    """Check what type the columns actually are"""
+    try:
+        with db.engine.connect() as conn:
+            print("\n" + "="*60)
+            print("DIAGNOSING COLUMN TYPES")
+            print("="*60)
+            
+            # Check orders table columns
+            result = conn.execute(text("""
+                SELECT column_name, data_type, udt_name
+                FROM information_schema.columns 
+                WHERE table_name = 'orders'
+                ORDER BY ordinal_position
+            """))
+            
+            print("\n📋 ORDERS TABLE STRUCTURE:")
+            for row in result:
+                print(f"   {row[0]}: {row[1]} (udt: {row[2]})")
+            
+            # Check if there's actual data
+            result = conn.execute(text("SELECT COUNT(*) FROM orders"))
+            count = result.scalar()
+            print(f"\n📊 Total orders in database: {count}")
+            
+            if count > 0:
+                # Show sample data
+                result = conn.execute(text("""
+                    SELECT id, order_number, total_amount, amount, 
+                           pg_typeof(total_amount) as total_type,
+                           pg_typeof(amount) as amount_type
+                    FROM orders LIMIT 3
+                """))
+                print("\n📄 Sample data:")
+                for row in result:
+                    print(f"   Order {row[0]}: total_amount='{row[2]}' (type: {row[4]}), amount='{row[3]}' (type: {row[5]})")
+            
+    except Exception as e:
+        print(f"❌ Diagnosis error: {e}")
+        
+
+def force_fix_column_types():
+    """Aggressively fix column types by dropping and recreating"""
+    try:
+        with db.engine.connect() as conn:
+            print("\n" + "="*60)
+            print("FORCE FIXING COLUMN TYPES")
+            print("="*60)
+            
+            # Get current column types
+            result = conn.execute(text("""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'orders' 
+                AND column_name IN ('total_amount', 'amount')
+            """))
+            
+            columns_info = {row[0]: row[1] for row in result}
+            
+            # Fix total_amount if it's not numeric
+            if columns_info.get('total_amount') not in ['double precision', 'numeric', 'real']:
+                print(f"\n🔧 Fixing total_amount (current type: {columns_info.get('total_amount')})")
+                
+                # Step 1: Add a temporary column
+                print("   1. Creating temporary column...")
+                conn.execute(text("""
+                    ALTER TABLE orders 
+                    ADD COLUMN IF NOT EXISTS total_amount_temp DOUBLE PRECISION
+                """))
+                
+                # Step 2: Copy data, converting to numeric (handle NULL and invalid values)
+                print("   2. Converting and copying data...")
+                conn.execute(text("""
+                    UPDATE orders 
+                    SET total_amount_temp = CASE 
+                        WHEN total_amount IS NULL OR total_amount = '' THEN 0
+                        WHEN total_amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN total_amount::DOUBLE PRECISION
+                        ELSE 0
+                    END
+                """))
+                
+                # Step 3: Drop old column
+                print("   3. Dropping old column...")
+                conn.execute(text("ALTER TABLE orders DROP COLUMN total_amount"))
+                
+                # Step 4: Rename temp column
+                print("   4. Renaming temporary column...")
+                conn.execute(text("""
+                    ALTER TABLE orders 
+                    RENAME COLUMN total_amount_temp TO total_amount
+                """))
+                
+                # Step 5: Set NOT NULL constraint
+                print("   5. Setting NOT NULL constraint...")
+                conn.execute(text("""
+                    ALTER TABLE orders 
+                    ALTER COLUMN total_amount SET NOT NULL
+                """))
+                
+                print("   ✅ total_amount fixed!")
+            else:
+                print(f"✓ total_amount is already numeric ({columns_info.get('total_amount')})")
+            
+            # Fix amount column if it exists and is not numeric
+            if 'amount' in columns_info:
+                if columns_info.get('amount') not in ['double precision', 'numeric', 'real']:
+                    print(f"\n🔧 Fixing amount (current type: {columns_info.get('amount')})")
+                    
+                    conn.execute(text("""
+                        ALTER TABLE orders 
+                        ADD COLUMN IF NOT EXISTS amount_temp DOUBLE PRECISION
+                    """))
+                    
+                    conn.execute(text("""
+                        UPDATE orders 
+                        SET amount_temp = CASE 
+                            WHEN amount IS NULL OR amount = '' THEN 0
+                            WHEN amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN amount::DOUBLE PRECISION
+                            ELSE 0
+                        END
+                    """))
+                    
+                    conn.execute(text("ALTER TABLE orders DROP COLUMN amount"))
+                    conn.execute(text("ALTER TABLE orders RENAME COLUMN amount_temp TO amount"))
+                    conn.execute(text("ALTER TABLE orders ALTER COLUMN amount SET NOT NULL"))
+                    conn.execute(text("ALTER TABLE orders ALTER COLUMN amount SET DEFAULT 0"))
+                    
+                    print("   ✅ amount fixed!")
+                else:
+                    print(f"✓ amount is already numeric ({columns_info.get('amount')})")
+            else:
+                # Add amount column if it doesn't exist
+                print("\n🔧 Adding missing amount column...")
+                conn.execute(text("""
+                    ALTER TABLE orders 
+                    ADD COLUMN amount DOUBLE PRECISION NOT NULL DEFAULT 0
+                """))
+                print("   ✅ amount column added!")
+            
+            conn.commit()
+            print("\n" + "="*60)
+            print("✅ ALL COLUMN TYPES FIXED!")
+            print("="*60)
+            
+    except Exception as e:
+        print(f"❌ Error fixing columns: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def verify_fix():
+    """Verify the fix worked"""
+    try:
+        with db.engine.connect() as conn:
+            print("\n" + "="*60)
+            print("VERIFYING FIX")
+            print("="*60)
+            
+            # Try the SUM query that was failing
+            result = conn.execute(text("SELECT SUM(total_amount) FROM orders"))
+            total = result.scalar()
+            print(f"✅ SUM(total_amount) works! Total: {total}")
+            
+            # Check column types again
+            result = conn.execute(text("""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'orders' 
+                AND column_name IN ('total_amount', 'amount')
+            """))
+            
+            print("\n📋 Final column types:")
+            for row in result:
+                print(f"   {row[0]}: {row[1]}")
+                
+    except Exception as e:
+        print(f"❌ Verification failed: {e}")
 
 
 def ensure_primary_keys_and_constraints():
@@ -264,6 +443,23 @@ def ensure_primary_keys_and_constraints():
 
 def initialize_app():
     with app.app_context():
+        # Step 1: Diagnose
+        diagnose_column_types()
+        
+        # Step 2: Ask for confirmation
+        print("\n⚠️  This will modify your database structure.")
+        print("    Your data will be preserved, but column types will change.")
+        response = input("\nContinue? (yes/no): ")
+        
+        if response.lower() != 'yes':
+            print("❌ Aborted by user")
+            sys.exit(0)
+        
+        # Step 3: Fix
+        force_fix_column_types()
+        
+        # Step 4: Verify
+        verify_fix()
         add_missing_order_columns()
         try:
             # Drop specific tables: order_items first (depends on orders), then orders
