@@ -33,7 +33,9 @@ if not POSTGRES_URL:
 
 # Fix SSL issue for Render PostgreSQL
 if POSTGRES_URL.startswith("postgres://"):
-    POSTGRES_URL = POSTGRES_URL.replace("postgres://", "postgresql://")
+    POSTGRES_URL = POSTGRES_URL.replace("postgres://", "postgresql+psycopg://")
+else:
+    POSTGRES_URL = "postgresql+psycopg://" + POSTGRES_URL.split("://")[1]
 
 app.config["SQLALCHEMY_DATABASE_URI"] = POSTGRES_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
