@@ -207,11 +207,12 @@ def initialize_app():
     with app.app_context():
         try:
             # Drop specific tables: order_items first (depends on orders), then orders
-            print("🗑️ Dropping order_items table...")
-            db.engine.execute(text("DROP TABLE IF EXISTS order_items CASCADE;"))
-            
-            print("🗑️ Dropping orders table...")
-            db.engine.execute(text("DROP TABLE IF EXISTS orders CASCADE;"))
+            with db.engine.connect() as conn:
+                print("🗑️ Dropping order_items table...")
+                conn.execute(text("DROP TABLE IF EXISTS order_items CASCADE;"))
+                
+                print("🗑️ Dropping orders table...")
+                conn.execute(text("DROP TABLE IF EXISTS orders CASCADE;"))
             
             db.create_all()
             print("✅ Database tables ready")
