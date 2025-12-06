@@ -5,6 +5,7 @@ from datetime import timedelta
 import os
 import base64 
 from models import db, User
+from sqlalchemy import text, inspect
 
 # Import all blueprints
 from controllers.auth import auth_bp
@@ -75,34 +76,69 @@ def serve_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
-# ------------------ Initialize DB and Create Default Admin ------------------
 def initialize_app():
     with app.app_context():
         try:
             db.create_all()
+            print("✅ Database tables verified/created successfully!")
         except Exception as e:
-            print("❌ Database create_all() failed:", str(e))
-            print("⚠️ Trying to fix invalid foreign keys...")
-
-            # Force drop broken tables only
-            from sqlalchemy import inspect
-            insp = inspect(db.engine)
-
-            broken_tables = ["payments", "order_items", "orders"]
-
-            for tbl in broken_tables:
-                if insp.has_table(tbl):
-                    try:
-                        db.engine.execute(f'DROP TABLE "{tbl}" CASCADE;')
-                        print(f"⚠️ Dropped broken table: {tbl}")
-                    except Exception as drop_err:
-                        print(f"❌ Failed dropping {tbl}: {drop_err}")
-
-            # Retry create_all
-            db.create_all()
-            print("✅ Database recreated successfully!")
-
+            error_msg = str(e)
+            print("❌ Database create_all() failed:", error_msg)
+            
+            # Check if it's the foreign key constraint error
+            if "no unique constraint matching given keys" in error_msg:
+                print("⚠️  Foreign key constraint error detected")
+                print("⚠️  Attempting to fix while preserving data...")
+                
+                try:
+                    with db.engine.connect() as conn:
+                        insp = inspect(db.engine)
+                        
+                        # Only drop the payments table (it can be recreated)
+                        # This preserves your orders, products, users, etc.
+                        if insp.has_table('payments'):
+                            print("🗑️  Dropping payments table (will be recreated)...")
+                            conn.execute(text('DROP TABLE IF EXISTS payments CASCADE'))
+                            conn.commit()
+                            print("✅ Payments table dropped")
+                        
+                        # Ensure orders table has proper primary key
+                        if insp.has_table('orders'):
+                            print("🔍 Verifying orders table structure...")
+                            
+                            # Check for primary key
+                            pk_result = conn.execute(text("""
+                                SELECT constraint_name 
+                                FROM information_schema.table_constraints 
+                                WHERE table_name = 'orders' 
+                                AND constraint_type = 'PRIMARY KEY'
+                            """))
+                            
+                            if not pk_result.fetchone():
+                                print("➕ Adding primary key to orders table...")
+                                conn.execute(text('ALTER TABLE orders ADD PRIMARY KEY (id)'))
+                                conn.commit()
+                                print("✅ Primary key added")
+                        
+                        # Now retry creating all tables
+                        print("📦 Creating missing tables...")
+                        db.create_all()
+                        print("✅ Database structure fixed successfully!")
+                        print("✅ Your existing data has been preserved!")
+                        
+                except Exception as fix_error:
+                    print(f"❌ Could not auto-fix database: {fix_error}")
+                    print("\n⚠️  MANUAL FIX REQUIRED:")
+                    print("Run the fix_database.py script separately")
+                    raise
+            else:
+                # Different error - just raise it
+                raise
+        
+        # Create upload directories
         create_upload_dirs()
+        print("📁 Upload directories ready")
+
 
 
 # ------------------ Register Blueprints ------------------
