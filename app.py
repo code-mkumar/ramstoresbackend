@@ -449,11 +449,7 @@ def initialize_app():
         # Step 2: Ask for confirmation
         print("\n⚠️  This will modify your database structure.")
         print("    Your data will be preserved, but column types will change.")
-        response = input("\nContinue? (yes/no): ")
         
-        if response.lower() != 'yes':
-            print("❌ Aborted by user")
-            sys.exit(0)
         
         # Step 3: Fix
         force_fix_column_types()
