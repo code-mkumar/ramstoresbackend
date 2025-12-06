@@ -20,9 +20,23 @@ from controllers.cursol import carousel_bp
 
 app = Flask(__name__)
 
+# # ------------------ Database Configuration ------------------
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 # ------------------ Database Configuration ------------------
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Render PostgreSQL URL (set in Render dashboard)
+POSTGRES_URL = os.environ.get("DATABASE_URL")
+
+if not POSTGRES_URL:
+    raise ValueError("❌ DATABASE_URL environment variable not set!")
+
+# Fix SSL issue for Render PostgreSQL
+if POSTGRES_URL.startswith("postgres://"):
+    POSTGRES_URL = POSTGRES_URL.replace("postgres://", "postgresql://")
+
+app.config["SQLALCHEMY_DATABASE_URI"] = POSTGRES_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # ------------------ JWT Configuration ------------------
 app.config['JWT_SECRET_KEY'] = 'oiuyigvgfiwgvbpoiwfgwoifbwoiygfb88gy9y9y9y'
