@@ -114,6 +114,64 @@ def fix_boolean_columns():
         print(f"⚠️ Could not fix boolean columns: {e}")
         # Don't raise; continue with app init
 
+def add_missing_order_columns():
+    """Add missing payment-related columns to orders table"""
+    try:
+        with db.engine.connect() as conn:
+            print("🔧 Checking and adding missing columns to orders table...")
+            
+            # List of columns to add: (column_name, data_type, constraints)
+            columns_to_add = [
+                ('payment_id', 'VARCHAR(255)', 'UNIQUE'),
+                ('order_payment_id', 'VARCHAR(255)', ''),
+                ('signature', 'VARCHAR(500)', ''),
+                ('amount', 'DECIMAL(10, 2)', ''),
+                ('currency', 'VARCHAR(10)', "DEFAULT 'INR'"),
+                ('payment_method', 'VARCHAR(50)', ''),
+                ('payment_status_detail', 'TEXT', ''),
+            ]
+            
+            for column_name, data_type, constraints in columns_to_add:
+                # Check if column exists
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'orders' 
+                    AND column_name = :column_name
+                """), {'column_name': column_name})
+                
+                if not result.fetchone():
+                    # Column doesn't exist, add it
+                    alter_query = f"ALTER TABLE orders ADD COLUMN {column_name} {data_type}"
+                    if constraints:
+                        alter_query += f" {constraints}"
+                    
+                    print(f"   Adding column: {column_name}")
+                    conn.execute(text(alter_query))
+                else:
+                    print(f"   ✓ Column {column_name} already exists")
+            
+            conn.commit()
+            print("✅ All missing columns added successfully!")
+            
+            # Verify the columns
+            print("\n📋 Current orders table structure:")
+            result = conn.execute(text("""
+                SELECT column_name, data_type, character_maximum_length, is_nullable
+                FROM information_schema.columns 
+                WHERE table_name = 'orders'
+                ORDER BY ordinal_position
+            """))
+            
+            for row in result:
+                nullable = "NULL" if row[3] == 'YES' else "NOT NULL"
+                length = f"({row[2]})" if row[2] else ""
+                print(f"   - {row[0]}: {row[1]}{length} {nullable}")
+                
+    except Exception as e:
+        print(f"❌ Error adding columns: {e}")
+        raise
+
 
 def ensure_primary_keys_and_constraints():
     """Ensure primary keys and unique constraints exist for referenced tables."""
@@ -205,6 +263,7 @@ def ensure_primary_keys_and_constraints():
 
 def initialize_app():
     with app.app_context():
+        add_missing_order_columns()
         try:
             # Drop specific tables: order_items first (depends on orders), then orders
             with db.engine.connect() as conn:
