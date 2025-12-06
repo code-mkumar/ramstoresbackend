@@ -148,7 +148,7 @@ def ensure_primary_keys_and_constraints():
                     print(f"🔧 Making {table}.id NOT NULL")
                     conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN id SET NOT NULL;"))
             
-            # Specific UNIQUE constraints if needed (e.g., for payment_id, but it's already in model)
+            # Specific UNIQUE constraints if needed
             # For users.username UNIQUE
             result = conn.execute(text("""
                 SELECT conname 
@@ -161,7 +161,7 @@ def ensure_primary_keys_and_constraints():
                 print("🔧 Adding UNIQUE constraint to users.username")
                 conn.execute(text("ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);"))
             
-            # Similarly for other uniques like products.sku, etc.
+            # For products.sku
             result = conn.execute(text("""
                 SELECT conname 
                 FROM pg_constraint 
@@ -185,6 +185,18 @@ def ensure_primary_keys_and_constraints():
                 print("🔧 Adding UNIQUE constraint to orders.order_number")
                 conn.execute(text("ALTER TABLE orders ADD CONSTRAINT orders_order_number_key UNIQUE (order_number);"))
             
+            # For orders.payment_id (newly added)
+            result = conn.execute(text("""
+                SELECT conname 
+                FROM pg_constraint 
+                WHERE conrelid = 'orders'::regclass 
+                AND contype = 'u' 
+                AND conkey = ARRAY[8]::int2[]  -- Adjust based on column position
+            """))
+            if not result.fetchone():
+                print("🔧 Adding UNIQUE constraint to orders.payment_id")
+                conn.execute(text("ALTER TABLE orders ADD CONSTRAINT orders_payment_id_key UNIQUE (payment_id);"))
+            
             conn.commit()
             print("✅ Primary keys and constraints ensured")
     except Exception as e:
@@ -194,10 +206,6 @@ def ensure_primary_keys_and_constraints():
 def initialize_app():
     with app.app_context():
         try:
-            # Optional: Drop and recreate schema for clean start (WARNING: DESTRUCTIVE - use only if safe)
-            # Uncomment below if you want to reset the entire DB
-            # db.engine.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
-            
             db.create_all()
             print("✅ Database tables ready")
             
