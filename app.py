@@ -248,11 +248,8 @@ def force_fix_column_types():
                 conn.execute(text("""
                     UPDATE orders 
                     SET total_amount_temp = CASE 
-                        WHEN total_amount IS NULL OR total_amount = '' THEN 0
-                        WHEN total_amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN total_amount::DOUBLE PRECISION
-                        ELSE 0
-                    END
-                """))
+                        WHEN total_amount IS NULL OR total_amount = '' OR total_amount = 'None' THEN 0
+                        WHEN total_amount ~ '^-?[0-9]+(\\.[0-9]+)?"""))
                 
                 # Step 3: Drop old column
                 print("   3. Dropping old column...")
@@ -289,9 +286,8 @@ def force_fix_column_types():
                     conn.execute(text("""
                         UPDATE orders 
                         SET amount_temp = CASE 
-                            WHEN amount IS NULL OR amount = '' THEN 0
-                            WHEN amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN amount::DOUBLE PRECISION
-                            ELSE 0
+                            WHEN amount IS NULL OR amount = 'None' THEN total_amount::DOUBLE PRECISION
+                            ELSE amount::DOUBLE PRECISION
                         END
                     """))
                     
@@ -310,7 +306,12 @@ def force_fix_column_types():
                     ALTER TABLE orders 
                     ADD COLUMN amount DOUBLE PRECISION NOT NULL DEFAULT 0
                 """))
-                print("   ✅ amount column added!")
+                # Copy total_amount values to amount
+                conn.execute(text("""
+                    UPDATE orders 
+                    SET amount = total_amount::DOUBLE PRECISION
+                """))
+                print("   ✅ amount column added and populated!")
             
             conn.commit()
             print("\n" + "="*60)
@@ -351,6 +352,7 @@ def verify_fix():
                 
     except Exception as e:
         print(f"❌ Verification failed: {e}")
+
 
 
 def ensure_primary_keys_and_constraints():
