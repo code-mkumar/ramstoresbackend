@@ -26,7 +26,7 @@ app = Flask(__name__)
 
 # ------------------ Database Configuration ------------------
 # Render PostgreSQL URL (set in Render dashboard)
-POSTGRES_URL = os.environ.get("DATABASE_URL")
+POSTGRES_URL = "postgresql://ramstores_user:xtKhcBiv23nf6osGJuoMiNvb5snlWQOz@dpg-d4psbaqdbo4c73bgq4vg-a/ramstores"
 
 if not POSTGRES_URL:
     raise ValueError("❌ DATABASE_URL environment variable not set!")
