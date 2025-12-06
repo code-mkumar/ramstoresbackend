@@ -21,10 +21,6 @@ from controllers.cursol import carousel_bp
 
 app = Flask(__name__)
 
-# # ------------------ Database Configuration ------------------
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
-# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 # ------------------ Database Configuration ------------------
 # Render PostgreSQL URL (set in Render dashboard)
 POSTGRES_URL = "postgresql://ramstores_user:xtKhcBiv23nf6osGJuoMiNvb5snlWQOz@dpg-d4psbaqdbo4c73bgq4vg-a.oregon-postgres.render.com/ramstores"
@@ -76,11 +72,58 @@ def serve_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
+def fix_boolean_columns():
+    """Fix boolean columns if they are incorrectly typed as text in the database."""
+    try:
+        with db.engine.connect() as conn:
+            # List of (table, column) pairs to check/fix
+            boolean_columns = [
+                ('carousel', 'is_active'),
+                ('categories', 'is_active'),
+                ('products', 'is_active'),
+                ('reviews', 'is_approved'),
+                ('notifications', 'is_read')
+            ]
+
+            for table, column in boolean_columns:
+                # Check current type
+                result = conn.execute(text("""
+                    SELECT data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table AND column_name = :column
+                """), {'table': table, 'column': column})
+                
+                row = result.fetchone()
+                if row and row[0] != 'boolean':
+                    print(f"🔧 Fixing {table}.{column} from {row[0]} to boolean")
+                    
+                    # Alter the column
+                    conn.execute(text(f"""
+                        ALTER TABLE {table} 
+                        ALTER COLUMN {column} TYPE BOOLEAN 
+                        USING (CASE 
+                            WHEN {column} IN ('true', 't', '1', 'yes') THEN true 
+                            WHEN {column} IN ('false', 'f', '0', 'no') THEN false 
+                            ELSE NULL 
+                        END)
+                    """))
+            
+            conn.commit()
+            print("✅ Boolean columns fixed")
+    except Exception as e:
+        print(f"⚠️ Could not fix boolean columns: {e}")
+        # Don't raise; continue with app init
+
+
 def initialize_app():
     with app.app_context():
         try:
             db.create_all()
             print("✅ Database tables ready")
+            
+            # Fix any boolean type mismatches (safe to run even if already correct)
+            fix_boolean_columns()
+            
         except Exception as e:
             print("❌ Error during DB init:", str(e))
             raise
