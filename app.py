@@ -4,7 +4,7 @@ from flask_jwt_extended import JWTManager
 from datetime import timedelta
 import os
 import base64 
-from models import db, User
+from models import db, User, Order, OrderItem
 from sqlalchemy import text, inspect
 
 # Import all blueprints
@@ -206,6 +206,13 @@ def ensure_primary_keys_and_constraints():
 def initialize_app():
     with app.app_context():
         try:
+            # Drop specific tables: order_items first (depends on orders), then orders
+            print("🗑️ Dropping order_items table...")
+            db.engine.execute(text("DROP TABLE IF EXISTS order_items CASCADE;"))
+            
+            print("🗑️ Dropping orders table...")
+            db.engine.execute(text("DROP TABLE IF EXISTS orders CASCADE;"))
+            
             db.create_all()
             print("✅ Database tables ready")
             
