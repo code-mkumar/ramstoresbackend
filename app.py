@@ -115,13 +115,96 @@ def fix_boolean_columns():
         # Don't raise; continue with app init
 
 
+def ensure_primary_keys_and_constraints():
+    """Ensure primary keys and unique constraints exist for referenced tables."""
+    try:
+        with db.engine.connect() as conn:
+            # List of tables to ensure PRIMARY KEY on 'id'
+            tables_with_pk = ['users', 'orders', 'categories', 'products', 'carousel']
+            
+            for table in tables_with_pk:
+                # Check if PRIMARY KEY exists on 'id'
+                result = conn.execute(text("""
+                    SELECT conname 
+                    FROM pg_constraint 
+                    WHERE conrelid = :table::regclass 
+                    AND contype = 'p' 
+                    AND conkey = ARRAY[1]::int2[]
+                """), {'table': table})
+                
+                if not result.fetchone():
+                    print(f"🔧 Adding PRIMARY KEY to {table}.id")
+                    conn.execute(text(f"ALTER TABLE {table} ADD PRIMARY KEY (id);"))
+                
+                # Also ensure 'id' is NOT NULL if not already (should be, but just in case)
+                result = conn.execute(text("""
+                    SELECT is_nullable 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table AND column_name = 'id'
+                """), {'table': table})
+                
+                row = result.fetchone()
+                if row and row[0] == 'YES':
+                    print(f"🔧 Making {table}.id NOT NULL")
+                    conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN id SET NOT NULL;"))
+            
+            # Specific UNIQUE constraints if needed (e.g., for payment_id, but it's already in model)
+            # For users.username UNIQUE
+            result = conn.execute(text("""
+                SELECT conname 
+                FROM pg_constraint 
+                WHERE conrelid = 'users'::regclass 
+                AND contype = 'u' 
+                AND conkey = ARRAY[2]::int2[]  -- Assuming username is 2nd column
+            """))
+            if not result.fetchone():
+                print("🔧 Adding UNIQUE constraint to users.username")
+                conn.execute(text("ALTER TABLE users ADD CONSTRAINT users_username_key UNIQUE (username);"))
+            
+            # Similarly for other uniques like products.sku, etc.
+            result = conn.execute(text("""
+                SELECT conname 
+                FROM pg_constraint 
+                WHERE conrelid = 'products'::regclass 
+                AND contype = 'u' 
+                AND conkey = ARRAY[3]::int2[]  -- Adjust index if needed
+            """))
+            if not result.fetchone():
+                print("🔧 Adding UNIQUE constraint to products.sku")
+                conn.execute(text("ALTER TABLE products ADD CONSTRAINT products_sku_key UNIQUE (sku);"))
+            
+            # For orders.order_number
+            result = conn.execute(text("""
+                SELECT conname 
+                FROM pg_constraint 
+                WHERE conrelid = 'orders'::regclass 
+                AND contype = 'u' 
+                AND conkey = ARRAY[3]::int2[]
+            """))
+            if not result.fetchone():
+                print("🔧 Adding UNIQUE constraint to orders.order_number")
+                conn.execute(text("ALTER TABLE orders ADD CONSTRAINT orders_order_number_key UNIQUE (order_number);"))
+            
+            conn.commit()
+            print("✅ Primary keys and constraints ensured")
+    except Exception as e:
+        print(f"⚠️ Could not ensure primary keys/constraints: {e}")
+
+
 def initialize_app():
     with app.app_context():
         try:
+            # Optional: Drop and recreate schema for clean start (WARNING: DESTRUCTIVE - use only if safe)
+            # Uncomment below if you want to reset the entire DB
+            # db.engine.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
+            
             db.create_all()
             print("✅ Database tables ready")
             
-            # Fix any boolean type mismatches (safe to run even if already correct)
+            # Ensure primary keys and constraints (fixes existing schema issues)
+            ensure_primary_keys_and_constraints()
+            
+            # Fix any boolean type mismatches
             fix_boolean_columns()
             
         except Exception as e:
