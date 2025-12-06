@@ -220,40 +220,40 @@ class OrderItem(db.Model):
         return f"<OrderItem Order:{self.order_id} Product:{self.product_id}>"
 
 
-# ------------------ Payments ------------------
-class Payment(db.Model):
-    __tablename__ = 'payments'
+# # ------------------ Payments ------------------
+# class Payment(db.Model):
+#     __tablename__ = 'payments'
 
-    id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+#     id = db.Column(db.Integer, primary_key=True)
+#     order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False, index=True)
+#     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     
-    # Razorpay fields
-    payment_id = db.Column(db.String(100), unique=True, nullable=True)   # Razorpay payment ID
-    order_payment_id = db.Column(db.String(100), nullable=True)          # Razorpay order ID
-    signature = db.Column(db.String(200), nullable=True)                 # Verification signature
+#     # Razorpay fields
+#     payment_id = db.Column(db.String(100), unique=True, nullable=True)   # Razorpay payment ID
+#     order_payment_id = db.Column(db.String(100), nullable=True)          # Razorpay order ID
+#     signature = db.Column(db.String(200), nullable=True)                 # Verification signature
     
-    amount = db.Column(db.Float, nullable=False)
-    currency = db.Column(db.String(10), default='INR')
-    status = db.Column(db.String(20), default='Pending', index=True)     # Pending / Completed / Failed / Refunded
-    payment_method = db.Column(db.String(50), nullable=True)             # card / upi / etc.
+#     amount = db.Column(db.Float, nullable=False)
+#     currency = db.Column(db.String(10), default='INR')
+#     status = db.Column(db.String(20), default='Pending', index=True)     # Pending / Completed / Failed / Refunded
+#     payment_method = db.Column(db.String(50), nullable=True)             # card / upi / etc.
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+#     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+#     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
-    order = db.relationship("Order", backref=db.backref("payments", lazy=True))
-    user = db.relationship("User", backref=db.backref("payments", lazy=True))
+#     # Relationships
+#     order = db.relationship("Order", backref=db.backref("payments", lazy=True))
+#     user = db.relationship("User", backref=db.backref("payments", lazy=True))
 
-    @validates('status')
-    def validate_status(self, key, status):
-        valid_statuses = ['Pending', 'Completed', 'Failed', 'Refunded']
-        if status not in valid_statuses:
-            raise ValueError(f"Payment status must be one of {valid_statuses}")
-        return status
+#     @validates('status')
+#     def validate_status(self, key, status):
+#         valid_statuses = ['Pending', 'Completed', 'Failed', 'Refunded']
+#         if status not in valid_statuses:
+#             raise ValueError(f"Payment status must be one of {valid_statuses}")
+#         return status
 
-    def __repr__(self):
-        return f"<Payment {self.id} - Order {self.order_id} - Status {self.status}>"
+#     def __repr__(self):
+#         return f"<Payment {self.id} - Order {self.order_id} - Status {self.status}>"
 
 # ------------------ Cart ------------------
 class Cart(db.Model):
