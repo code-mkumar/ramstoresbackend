@@ -71,74 +71,144 @@ def serve_uploaded_file(filename):
 
 
 def fix_column_types():
-    """Fix column types for orders table"""
+    """Fix incorrect column types across all tables"""
+
+    datetime_columns = [
+        ('users', 'created_at'), ('users', 'updated_at'),
+        ('carousel', 'created_at'), ('carousel', 'updated_at'),
+        ('categories', 'created_at'), ('categories', 'updated_at'),
+        ('products', 'created_at'), ('products', 'updated_at'),
+        ('orders', 'created_at'), ('orders', 'updated_at'),
+        ('cart', 'created_at'), ('cart', 'updated_at'),
+        ('reviews', 'created_at'), ('reviews', 'updated_at'),
+        ('wishlist', 'added_at'),
+        ('notifications', 'created_at'),
+    ]
+
     try:
         with db.engine.connect() as conn:
-            print("🔧 Fixing column types...")
-            
-            # Check if orders table exists
+            print("\n🔧 Running FULL database column fixes...\n")
+
+            # ----------------------------
+            # FIX DATETIME COLUMNS
+            # ----------------------------
+            for table, col in datetime_columns:
+
+                # Check if table exists
+                exists = conn.execute(text("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables
+                        WHERE table_name = :table
+                    )
+                """), {'table': table}).scalar()
+
+                if not exists:
+                    continue
+
+                # Get column type
+                result = conn.execute(text("""
+                    SELECT data_type
+                    FROM information_schema.columns
+                    WHERE table_name = :table
+                    AND column_name = :col
+                """), {'table': table, 'col': col}).fetchone()
+
+                if not result:
+                    continue
+
+                current_type = result[0]
+
+                # Only fix if TEXT
+                if current_type == "text":
+                    print(f"   ⚠️ Fixing {table}.{col} (TEXT → TIMESTAMP)")
+
+                    # Create temp column
+                    conn.execute(text(f"""
+                        ALTER TABLE {table}
+                        ADD COLUMN {col}_temp TIMESTAMP;
+                    """))
+
+                    # Convert old values
+                    conn.execute(text(f"""
+                        UPDATE {table}
+                        SET {col}_temp =
+                            CASE 
+                                WHEN {col} ~ '^[0-9]{{4}}-' THEN {col}::timestamp
+                                ELSE NOW()
+                            END
+                    """))
+
+                    # Replace old column
+                    conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {col}"))
+                    conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {col}_temp TO {col}"))
+
+                    print(f"   ✅ Fixed {table}.{col}")
+
+            # ----------------------------
+            # FIX orders.total_amount
+            # ----------------------------
+            print("\n🔧 Checking orders.total_amount…")
+
             result = conn.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'orders'
-                )
-            """))
-            
-            if not result.scalar():
-                print("   ⚠️ Orders table doesn't exist yet, skipping...")
-                return
-            
-            # Get current column types
-            result = conn.execute(text("""
-                SELECT column_name, data_type 
-                FROM information_schema.columns 
-                WHERE table_name = 'orders' 
-                AND column_name IN ('total_amount', 'amount')
-            """))
-            
-            columns_info = {row[0]: row[1] for row in result}
-            
-            # Fix total_amount if it's TEXT
-            if columns_info.get('total_amount') == 'text':
-                print(f"   Converting total_amount from TEXT to DOUBLE PRECISION...")
-                
+                SELECT data_type
+                FROM information_schema.columns
+                WHERE table_name = 'orders'
+                AND column_name = 'total_amount'
+            """)).fetchone()
+
+            if result and result[0] == "text":
+                print("   ⚠️ Converting total_amount TEXT → DOUBLE PRECISION")
+
                 conn.execute(text("""
                     ALTER TABLE orders 
-                    ADD COLUMN IF NOT EXISTS total_amount_temp DOUBLE PRECISION
+                    ADD COLUMN total_amount_temp DOUBLE PRECISION;
                 """))
-                
+
                 conn.execute(text("""
-                    UPDATE orders 
-                    SET total_amount_temp = CASE 
+                    UPDATE orders
+                    SET total_amount_temp = CASE
                         WHEN total_amount IS NULL OR total_amount = '' OR total_amount = 'None' THEN 0
                         WHEN total_amount ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN total_amount::DOUBLE PRECISION
                         ELSE 0
                     END
                 """))
-                
+
                 conn.execute(text("ALTER TABLE orders DROP COLUMN total_amount"))
                 conn.execute(text("ALTER TABLE orders RENAME COLUMN total_amount_temp TO total_amount"))
-                conn.execute(text("ALTER TABLE orders ALTER COLUMN total_amount SET NOT NULL"))
-                
-                print("   ✅ total_amount converted!")
-            
-            # Fix amount if it exists and has NULL values
-            if 'amount' in columns_info:
-                print("   Updating NULL amount values...")
+
+                print("   ✅ total_amount fixed!")
+
+            # ----------------------------
+            # FIX orders.amount
+            # ----------------------------
+            print("🔧 Checking orders.amount…")
+
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'orders'
+                AND column_name = 'amount'
+            """)).fetchone()
+
+            if result:
+                print("   ⚠️ Replacing NULL amount values…")
+
                 conn.execute(text("""
-                    UPDATE orders 
+                    UPDATE orders
                     SET amount = COALESCE(amount, total_amount, 0)
                     WHERE amount IS NULL
                 """))
-                
+
                 conn.execute(text("ALTER TABLE orders ALTER COLUMN amount SET NOT NULL"))
-                print("   ✅ amount column updated!")
-            
+
+                print("   ✅ amount column cleaned!")
+
             conn.commit()
-            print("✅ Column types fixed!")
-            
+            print("\n🎉 FULL COLUMN FIX COMPLETED SUCCESSFULLY!\n")
+
     except Exception as e:
-        print(f"⚠️ Error fixing columns: {e}")
+        print(f"\n❌ ERROR in fix_column_types(): {e}\n")
+
 
 
 def add_missing_columns():
