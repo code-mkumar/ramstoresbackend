@@ -136,7 +136,7 @@ def change_password():
 @jwt_required()
 def get_notifications():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         notifications = Notification.query.filter_by(user_id=user_id)\
             .order_by(Notification.created_at.desc()).all()
         
@@ -159,7 +159,7 @@ def get_notifications():
 @jwt_required()
 def mark_notification_read(notif_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         notification = Notification.query.get_or_404(notif_id)
         
         if notification.user_id != int(user_id):
@@ -182,7 +182,7 @@ def mark_notification_read(notif_id):
 @jwt_required()
 def get_wishlist():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         wishlist_items = Wishlist.query.filter_by(user_id=user_id).all()
         
         result = []
@@ -214,7 +214,7 @@ def get_wishlist():
 @jwt_required()
 def add_to_wishlist():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json()
         product_id = data.get('product_id')
         
@@ -257,7 +257,7 @@ def add_to_wishlist():
 @jwt_required()
 def remove_from_wishlist(wishlist_id):
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         wishlist_item = Wishlist.query.get_or_404(wishlist_id)
         
         if wishlist_item.user_id != int(user_id):
