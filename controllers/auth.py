@@ -377,11 +377,14 @@ def resend_otp():
     
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from sqlalchemy.exc import IntegrityError
 
 @auth_bp.route('/google-login', methods=['POST'])
 def google_login():
     try:
         token = request.json.get("token")
+        if not token:
+            return jsonify({"success": False, "message": "Token is required"}), 400
 
         # Verify Google token
         idinfo = id_token.verify_oauth2_token(
@@ -390,15 +393,16 @@ def google_login():
             GOOGLE_CLIENT_ID
         )
 
-        email = idinfo["email"]
+        email = idinfo.get("email")
         name = idinfo.get("name", "")
- 
+        if not email:
+            return jsonify({"success": False, "message": "Email not found in Google token"}), 400
 
-        # Check if user exists
+        # Try to find existing user
         user = User.query.filter_by(email=email).first()
 
         if not user:
-            # Create new user
+            # Create new user safely
             user = User(
                 username=email.split("@")[0],
                 email=email,
@@ -407,10 +411,17 @@ def google_login():
                 role="user",
             )
             db.session.add(user)
-            db.session.commit()
+            try:
+                db.session.flush()  # Assigns ID without committing yet
+            except IntegrityError:
+                db.session.rollback()
+                user = User.query.filter_by(email=email).first()
+                if not user:
+                    return jsonify({"success": False, "message": "Failed to create user"}), 500
 
-        # Create JWT token
+        # Now user.id is guaranteed to exist
         access_token = create_access_token(identity=str(user.id))
+        db.session.commit()  # commit only after flush success
 
         return jsonify({
             "success": True,
@@ -427,8 +438,8 @@ def google_login():
         })
 
     except ValueError:
-        # Invalid Google token
         return jsonify({"success": False, "message": "Invalid Google token"}), 401
 
     except Exception as e:
+        # Catch-all for unexpected errors
         return jsonify({"success": False, "message": str(e)}), 400
