@@ -36,8 +36,12 @@ def create_order():
         order = Order(
             user_id=current_user_id,
             order_number=order_number,
-            total_amount=0
+            total_amount=0,
+            amount=0,                     # ✅ REQUIRED
+            payment_status='Unpaid',
+            payment_status_detail='Pending'
         )
+
 
         db.session.add(order)
         db.session.flush()  # ✅ get order.id
@@ -74,6 +78,7 @@ def create_order():
             created_items.append(order_item)
 
             total_amount += total_price
+            order.amount = total_amount
             product.stock -= quantity  # ✅ reduce stock
 
         order.total_amount = total_amount
