@@ -280,7 +280,7 @@ def remove_from_wishlist(wishlist_id):
 @jwt_required()
 def get_orders():
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         orders = Order.query.filter_by(user_id=user_id)\
             .order_by(Order.created_at.desc()).all()
         

@@ -131,7 +131,7 @@ def create_order():
 @jwt_required()
 def get_user_orders():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
 
         orders = (
             Order.query.filter_by(user_id=current_user_id)
@@ -182,7 +182,7 @@ def get_user_orders():
 @jwt_required()
 def get_payment_qr(order_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         order = Order.query.get_or_404(order_id)
         
         # Check if user owns the order or is admin
