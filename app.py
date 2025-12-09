@@ -188,6 +188,66 @@ def fix_column_types():
     except Exception as e:
         print(f"\n❌ ERROR in fix_column_types(): {e}\n")
 
+def fix_postgres_sequences():
+    """
+    Fix AUTOINCREMENT issue after SQLite → PostgreSQL migration
+    Safe to run multiple times
+    """
+    try:
+        with db.engine.begin() as conn:
+            print("🔧 Fixing PostgreSQL sequences for all tables...")
+
+            tables = conn.execute(text("""
+                SELECT tablename
+                FROM pg_tables
+                WHERE schemaname = 'public'
+            """)).fetchall()
+
+            for (table_name,) in tables:
+                # Skip Alembic table if exists
+                if table_name == 'alembic_version':
+                    continue
+
+                # Check if table has an id column
+                has_id = conn.execute(text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = :table
+                    AND column_name = 'id'
+                """), {'table': table_name}).fetchone()
+
+                if not has_id:
+                    continue
+
+                seq_name = f"{table_name}_id_seq"
+
+                print(f"   🔹 Processing {table_name}.id")
+
+                # Create sequence if missing
+                conn.execute(text(f"""
+                    CREATE SEQUENCE IF NOT EXISTS {seq_name}
+                """))
+
+                # Attach sequence to column
+                conn.execute(text(f"""
+                    ALTER TABLE {table_name}
+                    ALTER COLUMN id
+                    SET DEFAULT nextval('{seq_name}')
+                """))
+
+                # Sync sequence with max(id)
+                conn.execute(text(f"""
+                    SELECT setval(
+                        '{seq_name}',
+                        COALESCE((SELECT MAX(id) FROM {table_name}), 0) + 1,
+                        false
+                    )
+                """))
+
+            print("✅ PostgreSQL AUTOINCREMENT fixed successfully")
+
+    except Exception as e:
+        print("❌ Error fixing sequences:", e)
 
 
 def add_missing_columns():
@@ -276,6 +336,8 @@ def initialize_app():
             # Step 1: Create all tables (if they don't exist)
             db.create_all()
             print("✅ Database tables created/verified")
+
+            fix_postgres_sequences()
             
             # Step 2: Fix column types AFTER tables exist
             fix_column_types()
