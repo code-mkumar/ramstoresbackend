@@ -395,6 +395,7 @@ def google_login():
 
         email = idinfo.get("email")
         name = idinfo.get("name", "")
+        profile_image = idinfo.get("picture")
         if not email:
             return jsonify({"success": False, "message": "Email not found in Google token"}), 400
 
@@ -409,6 +410,7 @@ def google_login():
                 full_name=name,
                 password=generate_password_hash(os.urandom(16).hex()),
                 role="user",
+                profile_image=profile_image
             )
             db.session.add(user)
             try:
