@@ -169,6 +169,9 @@ ORDER_CONFIRM_HTML = """
 # ---------------------------------------------------------
 #  Base Email Sender
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+#  Base Email Sender with detailed error logging
+# ---------------------------------------------------------
 def send_email(to_email, subject, html_content):
     try:
         msg = MIMEMultipart("alternative")
@@ -184,12 +187,12 @@ def send_email(to_email, subject, html_content):
         server.send_message(msg)
         server.quit()
 
-        print("Email sent successfully!")
-        return True
+        return True, "Email sent successfully!"
 
     except Exception as e:
-        print("Email error:", str(e))
-        return False
+        # Return the exception type and message
+        return False, f"{type(e).__name__}: {str(e)}"
+
 
 
 # ---------------------------------------------------------

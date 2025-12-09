@@ -232,26 +232,19 @@ def forgot_password():
         }
         
         # Send OTP via email with try/except
-        try:
-            mail_sent = send_otp_email(email, otp, user.full_name)
-        except Exception as mail_error:
-            print("Email send error:", mail_error)
-            return jsonify({
-                'success': False,
-                'message': 'Failed to send OTP. Check email configuration.'
-            }), 500
-        
-        if mail_sent:
-            return jsonify({
-                'success': True,
-                'message': 'OTP sent to your email'
-            }), 200
+        success, mail_message = send_otp_email(email, otp, user.full_name)
+
+        if success:
+            return jsonify({'success': True, 'message': 'OTP sent to your email'}), 200
         else:
+            # Return the exact SMTP error for debugging
             return jsonify({
                 'success': False,
-                'message': 'Failed to send OTP. Please try again.'
+                'message': 'Failed to send OTP',
+                'error': mail_message
             }), 500
-            
+
+                    
     except Exception as e:
         print("Forgot-password error:", e)
         return jsonify({'success': False, 'message': 'Internal server error'}), 500
