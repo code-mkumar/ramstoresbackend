@@ -211,7 +211,7 @@ def send_welcome_email(to_email, user_name):
 # ---------------------------------------------------------
 #  Order Confirmation Email Function
 # ---------------------------------------------------------
-def send_order_confirmation_email(to_email, user_name, order_number, total_amount):
+def send_order_confirmation_email(*, to_email, user_name, order_number, total_amount):
     html = ORDER_CONFIRM_HTML.format(
         user_name=user_name,
         order_number=order_number,
