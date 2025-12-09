@@ -15,12 +15,10 @@ def generate_order_number():
     random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"ORD{timestamp}{random_str}"
 
-# Create order
 @order_bp.route('/orders', methods=['POST'])
 @jwt_required()
 def create_order():
     try:
-        # ✅ FIX: Cast JWT identity to int
         current_user_id = int(get_jwt_identity())
         data = request.get_json()
 
@@ -28,23 +26,20 @@ def create_order():
         if not items:
             return jsonify({'success': False, 'message': 'No items found'}), 400
 
-        # ✅ Fetch user safely
         user = User.query.get_or_404(current_user_id)
 
-        # Create order
         order_number = generate_order_number()
         order = Order(
             user_id=current_user_id,
             order_number=order_number,
             total_amount=0,
-            amount=0,                     # ✅ REQUIRED
+            amount=0,
             payment_status='Unpaid',
             payment_status_detail='Pending'
         )
 
-
         db.session.add(order)
-        db.session.flush()  # ✅ get order.id
+        db.session.flush()  # get order.id
 
         total_amount = 0
         created_items = []
@@ -78,18 +73,20 @@ def create_order():
             created_items.append(order_item)
 
             total_amount += total_price
-            order.amount = total_amount
-            product.stock -= quantity  # ✅ reduce stock
+            product.stock -= quantity
 
+        # ✅ Update order totals once
         order.total_amount = total_amount
+        order.amount = total_amount
+
         db.session.commit()
 
-        # ✅ Send mail & track status
+        # ✅ Email handling
         mail_status = False
         mail_message = "Email not sent"
 
         try:
-            mail_res = send_order_confirmation_email(
+            send_order_confirmation_email(
                 total_amount=total_amount,
                 order_number=order_number,
                 user_name=user.full_name or user.username,
@@ -97,11 +94,9 @@ def create_order():
             )
             mail_status = True
             mail_message = "Order confirmation email sent"
-            print(mail_res)
 
         except Exception as mail_error:
             mail_message = str(mail_error)
-            print("Mail Error:", mail_error)
 
         return jsonify({
             "success": True,
