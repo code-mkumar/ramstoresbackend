@@ -58,6 +58,8 @@ def get_products():
                 'category_img': product.category.image_url,  # Added category image
                 'average_rating': product.average_rating(),
                 'review_count': product.reviews.filter_by(is_approved=True).count(),
+                'ratings': product.ratings(),                # ➤ Added
+                'rating_breakdown': product.rating_breakdown(),  # ➤ Added
                 'created_at': product.created_at.isoformat()
             } for product in products.items],
             'pagination': {

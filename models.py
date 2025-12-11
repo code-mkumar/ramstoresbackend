@@ -139,6 +139,38 @@ class Product(db.Model):
         if stock < 0:
             raise ValueError("Stock cannot be negative")
         return stock
+    
+    def ratings(self):
+    
+        results = (
+            db.session.query(Review, User)
+            .join(User, User.id == Review.user_id)
+            .filter(
+                Review.product_id == self.id,
+                Review.is_approved == True
+            )
+            .order_by(Review.created_at.desc())
+            .all()
+        )
+
+        return [
+            {
+                "username": user.username,
+                "rating": review.rating,
+                "comment": review.comment,
+                "created_at": review.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            for review, user in results
+        ]
+
+    def rating_breakdown(self):
+        breakdown = {str(i): [] for i in range(1, 6)}
+
+        for review in self.reviews.filter_by(is_approved=True).all():
+            breakdown[str(review.rating)].append(review.comment)
+
+        return breakdown
+
 
     def average_rating(self):
         """Calculate average rating from approved reviews"""
