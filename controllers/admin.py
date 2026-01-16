@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 import io
 from flask import send_file
-
+from utils.helper import fmt
 from sqlalchemy import text
 
 
@@ -471,10 +471,7 @@ def confirm_all_orders():
             order_dict = {
                 "order_number": order.order_number,
                 "customer": order.customer.username,
-                "created_at": (
-                        order.created_at.strftime('%Y-%m-%d %H:%M')
-                        if order.created_at else None
-                    ),
+                "created_at": fmt(order.created_at),
                 "total_amount": order.total_amount,
                 "items": [
                     {

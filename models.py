@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import validates
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
-
+from utils.helper import fmt
 db = SQLAlchemy()
 
 # ------------------ Carousel ------------------
@@ -158,10 +158,7 @@ class Product(db.Model):
                 "username": user.username,
                 "rating": review.rating,
                 "comment": review.comment,
-                "created_at": (
-                    review.created_at.strftime("%Y-%m-%d %H:%M:%S")
-                    if review.created_at else None
-                )
+                "created_at": fmt(review.created_at),
             }
             for review, user in results
         ]
