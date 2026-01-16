@@ -14,7 +14,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 import io
 from flask import send_file
-from utils.helper import fmt
+from utils.helper import fmt, iso
 from sqlalchemy import text
 
 
@@ -73,7 +73,7 @@ def get_all_users():
                 'store_name': u.store_name,
                 'phone': u.phone,
                 'address': u.address,
-                'created_at': u.created_at.isoformat()
+                'created_at': iso(u.created_at)
             } for u in users]
         }), 200
 
@@ -243,7 +243,7 @@ def get_all_products():
                 'category_id': p.category_id,
                 'category_name': p.category.name if p.category else None,
                 'is_active': p.is_active,
-                'created_at': p.created_at.isoformat()
+                'created_at': iso(p.created_at)
             } for p in products]
         }), 200
 
@@ -533,7 +533,7 @@ def get_all_orders():
                 'total_amount': o.total_amount,
                 'status': o.status,
                 'payment_status': o.payment_status,
-                'created_at': o.created_at.isoformat(),
+                'created_at': iso(o.created_at),
                 'items': items  # include the order items
             })
         
@@ -641,7 +641,7 @@ def get_all_categories():
                 'is_active': c.is_active,
                 'subcategories_count': c.subcategories.count(),
                 'products_count': c.products.count(),
-                'created_at': c.created_at.isoformat()
+                'created_at': iso(c.created_at)
             } for c in categories]
         }), 200
 
@@ -850,7 +850,7 @@ def get_all_reviews():
             "rating": r.rating,
             "comment": r.comment,
             "is_approved": r.is_approved,
-            "created_at": r.created_at.isoformat()
+            "created_at": iso(r.created_at)
         } for r in reviews]), 200
 
     except Exception as e:
@@ -882,7 +882,7 @@ def get_pending_reviews():
                 "product_name": r.product.name,
                 "rating": r.rating,
                 "comment": r.comment,
-                "created_at": r.created_at.isoformat()
+                "created_at": iso(r.created_at)
             } for r in reviews]
         }), 200
 
@@ -1030,7 +1030,7 @@ def get_all_carousel():
                 'subtitle': c.subtitle,
                 'is_active': c.is_active,
                 'display_order': c.display_order,
-                'created_at': c.created_at.isoformat()
+                'created_at': iso(c.created_at)
             } for c in carousel_items]
         }), 200
 
@@ -1234,7 +1234,7 @@ def get_all_notifications():
                 'title': n.title,
                 'message': n.message,
                 'is_read': n.is_read,
-                'created_at': n.created_at.isoformat()
+                'created_at': iso(n.created_at)
             })
 
         return jsonify({'success': True, 'notifications': notifications_data}), 200

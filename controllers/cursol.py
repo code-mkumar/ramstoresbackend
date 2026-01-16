@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Carousel, User
 from utils.fileupload import FileUpload
+from utils.helper import iso
 import os
 
 carousel_bp = Blueprint('carousel', __name__)
@@ -48,7 +49,7 @@ def get_all_carousel():
                 'subtitle': item.subtitle,
                 'is_active': item.is_active,
                 'display_order': item.display_order,
-                'created_at': item.created_at.isoformat()
+                'created_at': iso(item.created_at)
             } for item in carousel_items]
         }), 200
     except Exception as e:

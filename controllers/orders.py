@@ -6,6 +6,7 @@ import random
 import string
 import datetime
 from utils.email_services import send_order_confirmation_email
+from utils.helper import iso
 
 order_bp = Blueprint('order', __name__)
 
@@ -168,7 +169,7 @@ def get_user_orders():
                 "total_amount": order.total_amount,
                 "status": order.status,
                 "payment_status": order.payment_status,
-                "created_at": order.created_at.isoformat(),
+                "created_at": iso(order.created_at),
                 "items": items_data
             })
 

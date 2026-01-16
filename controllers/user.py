@@ -4,7 +4,7 @@ from models import db, User, Notification, Wishlist, Product,Order
 from utils.fileupload import FileUpload
 from werkzeug.security import generate_password_hash
 from datetime import datetime
-
+from utils.helper import iso
 user_bp = Blueprint('user', __name__)
 
 # ------------------ Get User Profile ------------------
@@ -26,7 +26,7 @@ def get_profile():
                 'address': user.address,
                 'profile_image': user.profile_image,
                 'role': user.role,
-                'created_at': user.created_at.isoformat()
+                'created_at': iso(user.created_at)
             }
         }), 200
     except Exception as e:
@@ -147,7 +147,7 @@ def get_notifications():
                 'title': notif.title,
                 'message': notif.message,
                 'is_read': notif.is_read,
-                'created_at': notif.created_at.isoformat()
+                'created_at': iso(notif.created_at)
             } for notif in notifications]
         }), 200
     except Exception as e:
@@ -198,7 +198,7 @@ def get_wishlist():
                     'description': product.description,
                     'stock': product.stock,
                     'average_rating': product.average_rating(),
-                    'added_at': item.added_at.isoformat()
+                    'added_at': iso(item.added_at)
                 })
         
         return jsonify({
@@ -293,7 +293,7 @@ def get_orders():
             'total_amount': order.total_amount,
             'status': order.status,
             'payment_status': order.payment_status,
-            'created_at': order.created_at.isoformat()
+            'created_at': iso(order.created_at)
         } for order in orders]
         
         return jsonify({

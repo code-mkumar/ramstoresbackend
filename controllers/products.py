@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
 from models import db, Product, Category, User, Review
-
+from utils.helper import iso
 product_bp = Blueprint('product', __name__)
 
 # Get all products with filtering and pagination
@@ -60,7 +60,7 @@ def get_products():
                 'review_count': product.reviews.filter_by(is_approved=True).count(),
                 'ratings': product.ratings(),                # ➤ Added
                 'rating_breakdown': product.rating_breakdown(),  # ➤ Added
-                'created_at': product.created_at.isoformat()
+                'created_at': iso(product.created_at)
             } for product in products.items],
             'pagination': {
                 'page': products.page,
@@ -99,7 +99,7 @@ def get_product(product_id):
                 'is_active': product.is_active,
                 'average_rating': product.average_rating(),
                 'review_count': product.reviews.filter_by(is_approved=True).count(),
-                'created_at': product.created_at.isoformat()
+                'created_at': iso(product.created_at)
             }
         }), 200
 
@@ -250,7 +250,7 @@ def get_seller_products():
                 'is_active': product.is_active,
                 'total_orders': product.orders.count(),
                 'average_rating': product.average_rating(),
-                'created_at': product.created_at.isoformat()
+                'created_at': iso(product.created_at)
             } for product in products.items],
             'pagination': {
                 'page': products.page,

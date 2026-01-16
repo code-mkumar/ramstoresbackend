@@ -5,6 +5,9 @@ import base64
 def fmt(dt, fmt="%Y-%m-%d %H:%M:%S"):
     return dt.strftime(fmt) if dt else None
 
+def iso(dt):
+    return dt.isoformat() if dt else None
+
 # ------------------ Generate QR Code ------------------
 def generate_qrcode(data: str) -> str:
     """

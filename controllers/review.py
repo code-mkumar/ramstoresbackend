@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Review, Product, User, Order, OrderItem,Notification
 from datetime import datetime, timedelta
-
+from utils.helper import iso
 review_bp = Blueprint("review", __name__)
 
 
@@ -31,7 +31,7 @@ def get_product_reviews(product_id):
                 "rating": r.rating,
                 "comment": r.comment,
                 "user_name": r.user.full_name,
-                "created_at": r.created_at.isoformat()
+                "created_at": iso(r.created_at)
             } for r in reviews.items],
             "pagination": {
                 "page": reviews.page,
@@ -247,7 +247,7 @@ def get_pending_reviews():
                 "comment": r.comment,
                 "user_name": r.user.full_name,
                 "product_name": r.product.name,
-                "created_at": r.created_at.isoformat()
+                "created_at": iso(r.created_at)
             } for r in reviews.items],
             "pagination": {
                 "page": reviews.page,

@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Category, User
 from utils.fileupload import FileUpload
+from utils.helper import iso
 from sqlalchemy import or_
 
 category_bp = Blueprint('category', __name__)
@@ -74,7 +75,7 @@ def get_category(category_id):
                 'image_url': category.image_url,
                 'parent_id': category.parent_id,
                 'is_active': category.is_active,
-                'created_at': category.created_at.isoformat()
+                'created_at': iso(category.created_at)
             }
         }), 200
     except Exception as e:
