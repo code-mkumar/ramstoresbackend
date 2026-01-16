@@ -21,7 +21,7 @@ from controllers.cursol import carousel_bp
 app = Flask(__name__)
 
 # ------------------ Database Configuration ------------------
-POSTGRES_URL = "postgresql://ramstores_user:xtKhcBiv23nf6osGJuoMiNvb5snlWQOz@dpg-d4psbaqdbo4c73bgq4vg-a.oregon-postgres.render.com/ramstores"
+POSTGRES_URL = "postgresql://groceryshop_ej5r_user:BPaNF1NQL9L8VPKCN835WaZmJFB0kuj3@dpg-d5l2klngi27c738heh2g-a.oregon-postgres.render.com/groceryshop_ej5r"
 
 if not POSTGRES_URL:
     raise ValueError("❌ DATABASE_URL environment variable not set!")
