@@ -158,7 +158,10 @@ class Product(db.Model):
                 "username": user.username,
                 "rating": review.rating,
                 "comment": review.comment,
-                "created_at": review.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                "created_at": (
+                    review.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    if review.created_at else None
+                )
             }
             for review, user in results
         ]
