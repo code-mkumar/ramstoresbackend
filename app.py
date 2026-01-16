@@ -293,42 +293,75 @@ def add_missing_columns():
 
 
 def fix_boolean_columns():
-    """Fix boolean columns if they are incorrectly typed as text"""
+    """
+    SAFEST possible boolean fix:
+    - Works for BIGINT, INTEGER, TEXT
+    - No casting errors
+    - Production-safe
+    - Idempotent
+    """
     try:
-        with db.engine.connect() as conn:
+        with db.engine.begin() as conn:
+            print("🔧 Fixing boolean columns (safe temp-column method)...")
+
             boolean_columns = [
                 ('carousel', 'is_active'),
                 ('categories', 'is_active'),
                 ('products', 'is_active'),
                 ('reviews', 'is_approved'),
-                ('notifications', 'is_read')
+                ('notifications', 'is_read'),
+                ('users', 'is_active'),
             ]
 
             for table, column in boolean_columns:
-                result = conn.execute(text("""
-                    SELECT data_type 
-                    FROM information_schema.columns 
+
+                # Check column exists
+                col = conn.execute(text("""
+                    SELECT data_type
+                    FROM information_schema.columns
                     WHERE table_name = :table AND column_name = :column
-                """), {'table': table, 'column': column})
-                
-                row = result.fetchone()
-                if row and row[0] != 'boolean':
-                    print(f"🔧 Fixing {table}.{column} to boolean")
-                    
-                    conn.execute(text(f"""
-                        ALTER TABLE {table} 
-                        ALTER COLUMN {column} TYPE BOOLEAN 
-                        USING (CASE 
-                            WHEN {column} IN ('true', 't', '1', 'yes') THEN true 
-                            WHEN {column} IN ('false', 'f', '0', 'no') THEN false 
-                            ELSE false 
-                        END)
-                    """))
-            
-            conn.commit()
-            print("✅ Boolean columns fixed")
+                """), {'table': table, 'column': column}).fetchone()
+
+                if not col:
+                    continue
+
+                if col[0] == 'boolean':
+                    continue
+
+                print(f"   🔄 Fixing {table}.{column} → BOOLEAN")
+
+                # 1️⃣ Add temp boolean column
+                conn.execute(text(f"""
+                    ALTER TABLE {table}
+                    ADD COLUMN {column}_tmp BOOLEAN;
+                """))
+
+                # 2️⃣ Normalize values safely
+                conn.execute(text(f"""
+                    UPDATE {table}
+                    SET {column}_tmp =
+                        CASE
+                            WHEN {column}::text IN ('1','true','t','yes') THEN TRUE
+                            ELSE FALSE
+                        END;
+                """))
+
+                # 3️⃣ Drop old column
+                conn.execute(text(f"""
+                    ALTER TABLE {table}
+                    DROP COLUMN {column};
+                """))
+
+                # 4️⃣ Rename temp column
+                conn.execute(text(f"""
+                    ALTER TABLE {table}
+                    RENAME COLUMN {column}_tmp TO {column};
+                """))
+
+            print("✅ Boolean columns fixed successfully")
+
     except Exception as e:
-        print(f"⚠️ Could not fix boolean columns: {e}")
+        print(f"❌ Boolean fix failed:", e)
 
 
 def initialize_app():
