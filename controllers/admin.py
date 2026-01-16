@@ -471,7 +471,10 @@ def confirm_all_orders():
             order_dict = {
                 "order_number": order.order_number,
                 "customer": order.customer.username,
-                "created_at": order.created_at.strftime('%Y-%m-%d %H:%M'),
+                "created_at": (
+                        order.created_at.strftime('%Y-%m-%d %H:%M')
+                        if order.created_at else None
+                    ),
                 "total_amount": order.total_amount,
                 "items": [
                     {
