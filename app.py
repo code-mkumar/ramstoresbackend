@@ -70,6 +70,7 @@ def serve_uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
+
 def fix_column_types():
     try:
         print("\n🔧 Starting full PostgreSQL column fix...\n")
@@ -292,42 +293,65 @@ def add_missing_columns():
 
 
 def fix_boolean_columns():
-    """Fix boolean columns if they are incorrectly typed as text"""
+    """
+    Fix boolean columns that were migrated from SQLite as BIGINT or TEXT
+    Converts 0/1 or text values into proper PostgreSQL BOOLEAN
+    SAFE to run multiple times
+    """
     try:
-        with db.engine.connect() as conn:
+        with db.engine.begin() as conn:
+            print("🔧 Fixing boolean columns (BIGINT / TEXT → BOOLEAN)...")
+
             boolean_columns = [
                 ('carousel', 'is_active'),
                 ('categories', 'is_active'),
                 ('products', 'is_active'),
                 ('reviews', 'is_approved'),
-                ('notifications', 'is_read')
+                ('notifications', 'is_read'),
+                ('users', 'is_active'),
             ]
 
             for table, column in boolean_columns:
+
+                # check column exists
                 result = conn.execute(text("""
-                    SELECT data_type 
-                    FROM information_schema.columns 
+                    SELECT data_type
+                    FROM information_schema.columns
                     WHERE table_name = :table AND column_name = :column
-                """), {'table': table, 'column': column})
-                
-                row = result.fetchone()
-                if row and row[0] != 'boolean':
-                    print(f"🔧 Fixing {table}.{column} to boolean")
-                    
-                    conn.execute(text(f"""
-                        ALTER TABLE {table} 
-                        ALTER COLUMN {column} TYPE BOOLEAN 
-                        USING (CASE 
-                            WHEN {column} IN ('true', 't', '1', 'yes') THEN true 
-                            WHEN {column} IN ('false', 'f', '0', 'no') THEN false 
-                            ELSE false 
-                        END)
-                    """))
-            
-            conn.commit()
-            print("✅ Boolean columns fixed")
+                """), {'table': table, 'column': column}).fetchone()
+
+                if not result:
+                    continue
+
+                current_type = result[0]
+
+                if current_type == 'boolean':
+                    continue
+
+                print(f"   🔄 {table}.{column}: {current_type} → BOOLEAN")
+
+                # Normalize values first
+                conn.execute(text(f"""
+                    UPDATE {table}
+                    SET {column} =
+                        CASE
+                            WHEN {column} IN (1, '1', 'true', 't', 'yes') THEN 1
+                            ELSE 0
+                        END
+                """))
+
+                # Convert column type
+                conn.execute(text(f"""
+                    ALTER TABLE {table}
+                    ALTER COLUMN {column}
+                    TYPE BOOLEAN
+                    USING ({column}::INTEGER = 1)
+                """))
+
+            print("✅ Boolean columns fixed successfully")
+
     except Exception as e:
-        print(f"⚠️ Could not fix boolean columns: {e}")
+        print(f"❌ Error fixing boolean columns: {e}")
 
 
 def initialize_app():
